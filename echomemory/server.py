@@ -7,6 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from .storage import Storage
 from .models import KnowledgeItem, Relation
 from .auth import AgentRegistry, verify_signature, sign_message, derive_shared_key, encrypt_payload
+from .web_ui import get_login_page, get_admin_page
 
 DEFAULT_PORT = int(os.environ.get("ECHOMEMORY_PORT", "9090"))
 
@@ -54,6 +55,12 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
 
+    def _send_html(self, html, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(html.encode())
+
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
         if length:
@@ -75,6 +82,12 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         # Public endpoints (no auth required)
         if path == "/api/health":
             return self._send_json({"status": "ok", "service": "echomemory", "version": "0.1.0", "auth": "enabled"})
+
+        # Web UI pages (no API auth, uses localStorage token)
+        if path in ["/", "/login"]:
+            return self._send_html(get_login_page())
+        if path == "/admin":
+            return self._send_html(get_admin_page())
 
         # Auth endpoint
         if path == "/api/auth/login":
