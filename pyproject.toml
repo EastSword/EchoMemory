@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "echomemory"
+version = "0.1.0"
+description = "Shared memory layer for AI Agents — capture decisions, lessons, and knowledge across devices and sessions"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "EchoMind Team"}
+]
+keywords = ["ai", "agent", "memory", "knowledge", "mcp", "shared"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.scripts]
+echomemory = "echomemory.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/user/EchoMemory"
+Repository = "https://github.com/user/EchoMemory"
+
+[tool.setuptools.packages.find]
+include = ["echomemory*"]

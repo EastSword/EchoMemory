@@ -1,0 +1,28 @@
+# Data files — NEVER commit these
+*.db
+*.sqlite
+*.sqlite3
+
+# Local config with secrets
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
