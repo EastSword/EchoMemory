@@ -197,9 +197,11 @@ function headers(){return{'Authorization':'Bearer '+token,'Content-Type':'applic
 function showPanel(name){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     document.getElementById('panel-'+name).classList.add('active');
-    document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('.nav button').forEach(function(b){
+        b.classList.toggle('active', b.textContent.includes(name==='knowledge'?'知识':'Agent'));
+    });
     if(name==='agents')loadAgents();
+    if(name==='knowledge')loadKnowledge();
 }
 function logout(){localStorage.removeItem('em_token');localStorage.removeItem('em_agent');window.location='/login';}
 function openModal(id){document.getElementById(id).classList.add('active');}
@@ -215,7 +217,7 @@ async function loadStats(){
     document.getElementById('statsRow').innerHTML=
         '<div class="stat-card"><div class="num">'+s.active+'</div><div class="label">活跃知识</div></div>'+
         '<div class="stat-card"><div class="num">'+Object.keys(s.by_type||{}).length+'</div><div class="label">知识类型</div></div>'+
-        '<div class="stat-card"><div class="num">'+tags.length+'</div><div class="label">标签数</div></div>'+
+        '<div class="stat-card"><div class="num">'+(Array.isArray(tags)?tags.length:0)+'</div><div class="label">标签数</div></div>'+
         '<div class="stat-card"><div class="num">'+s.total+'</div><div class="label">总条目</div></div>';
 }
 
@@ -223,7 +225,9 @@ async function loadKnowledge(){
     var type=document.getElementById('typeFilter').value;
     var url='/api/knowledge?limit=50'+(type?'&type='+type:'');
     var res=await fetch(url,{headers:headers()});
+    if(res.status===401){logout();return;}
     var items=await res.json();
+    if(!Array.isArray(items)){items=[];}
     renderKnowledge(items);
 }
 
