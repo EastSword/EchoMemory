@@ -8,6 +8,7 @@ def get_login_page():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EchoMemory - Login</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23f59e0b'/><stop offset='100%25' stop-color='%23d97706'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='%230f172a' stroke='url(%23g)' stroke-width='4'/><path d='M30 50 C30 35 40 25 50 25 C60 25 70 35 70 50 C70 65 60 75 50 75 C40 75 30 65 30 50 Z' fill='none' stroke='%23f59e0b' stroke-width='3'/><circle cx='50' cy='42' r='6' fill='%23f59e0b'/><path d='M38 58 Q50 68 62 58' fill='none' stroke='%23f59e0b' stroke-width='2.5' stroke-linecap='round'/><circle cx='35' cy='50' r='3' fill='%2322c55e' opacity='0.8'/><circle cx='65' cy='50' r='3' fill='%2360a5fa' opacity='0.8'/><circle cx='50' cy='30' r='2.5' fill='%23c084fc' opacity='0.8'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -53,6 +54,7 @@ def get_admin_page():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EchoMemory - Admin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23f59e0b'/><stop offset='100%25' stop-color='%23d97706'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='%230f172a' stroke='url(%23g)' stroke-width='4'/><path d='M30 50 C30 35 40 25 50 25 C60 25 70 35 70 50 C70 65 60 75 50 75 C40 75 30 65 30 50 Z' fill='none' stroke='%23f59e0b' stroke-width='3'/><circle cx='50' cy='42' r='6' fill='%23f59e0b'/><path d='M38 58 Q50 68 62 58' fill='none' stroke='%23f59e0b' stroke-width='2.5' stroke-linecap='round'/><circle cx='35' cy='50' r='3' fill='%2322c55e' opacity='0.8'/><circle cx='65' cy='50' r='3' fill='%2360a5fa' opacity='0.8'/><circle cx='50' cy='30' r='2.5' fill='%23c084fc' opacity='0.8'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f8fafc;--sec:#94a3b8;--accent:#f59e0b;--success:#22c55e;--danger:#ef4444}
