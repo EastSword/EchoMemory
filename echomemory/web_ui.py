@@ -26,7 +26,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 </head>
 <body>
 <div class="login-card">
-<div class="logo">🧠 Echo<span>Memory</span></div>
+<div class="logo"><svg width="22" height="22" viewBox="0 0 100 100" style="vertical-align:middle;margin-right:6px"><defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient></defs><circle cx="50" cy="50" r="45" fill="#0f172a" stroke="url(#lg)" stroke-width="4"/><path d="M30 50 C30 35 40 25 50 25 C60 25 70 35 70 50 C70 65 60 75 50 75 C40 75 30 65 30 50 Z" fill="none" stroke="#f59e0b" stroke-width="3"/><circle cx="50" cy="42" r="6" fill="#f59e0b"/><path d="M38 58 Q50 68 62 58" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><circle cx="35" cy="50" r="3" fill="#22c55e" opacity="0.8"/><circle cx="65" cy="50" r="3" fill="#60a5fa" opacity="0.8"/><circle cx="50" cy="30" r="2.5" fill="#c084fc" opacity="0.8"/></svg>Echo<span>Memory</span></div>
 <div class="form-group"><label>Agent ID</label><input id="agentId" placeholder="agent_xxxxxxxx"></div>
 <div class="form-group"><label>Secret</label><input id="secret" type="password" placeholder="your secret"></div>
 <button class="btn" onclick="login()">Login</button>
@@ -110,7 +110,7 @@ tr:last-child td{border-bottom:none}
 </head>
 <body>
 <header class="header">
-<div class="logo">🧠 Echo<span>Memory</span></div>
+<div class="logo"><svg width="22" height="22" viewBox="0 0 100 100" style="vertical-align:middle;margin-right:6px"><defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient></defs><circle cx="50" cy="50" r="45" fill="#0f172a" stroke="url(#lg)" stroke-width="4"/><path d="M30 50 C30 35 40 25 50 25 C60 25 70 35 70 50 C70 65 60 75 50 75 C40 75 30 65 30 50 Z" fill="none" stroke="#f59e0b" stroke-width="3"/><circle cx="50" cy="42" r="6" fill="#f59e0b"/><path d="M38 58 Q50 68 62 58" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><circle cx="35" cy="50" r="3" fill="#22c55e" opacity="0.8"/><circle cx="65" cy="50" r="3" fill="#60a5fa" opacity="0.8"/><circle cx="50" cy="30" r="2.5" fill="#c084fc" opacity="0.8"/></svg>Echo<span>Memory</span></div>
 <nav class="nav">
 <button class="active" onclick="showPanel('knowledge')">知识库</button>
 <button onclick="showPanel('agents')">Agent 管理</button>

@@ -1,4 +1,4 @@
-# 🧠 EchoMemory
+# <img src="assets/logo.svg" width="32" height="32" alt="EchoMemory"> EchoMemory
 
 **给 AI Agent 团队用的共享大脑。pip install 即用，自带身份认证，中文原生。**
 
