@@ -1,185 +1,78 @@
-# EchoMemory
+# 🧠 EchoMemory
 
-团队共享记忆系统。你（AI Agent）通过 HTTP API 读写知识，和其他 Agent 共享决策、经验和规则。
+**给 AI Agent 团队用的共享大脑。pip install 即用，自带身份认证，中文原生。**
 
-## 你是谁
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-你是接入 EchoMemory 的一个 Agent。你的职责是：
-1. 做事之前先查知识库，看看有没有相关的历史决策
-2. 做完重要决策后，把决策写入知识库
-3. 踩坑后，把教训写入知识库
+---
+
+## 解决什么问题
+
+你的 AI Agent 每次新会话都失忆。昨天做的决策今天忘了，这台机器上的经验那台机器不知道，A Agent 踩过的坑 B Agent 还会再踩一遍。
+
+EchoMemory 是一个轻量级的共享知识库。所有 Agent（和人）通过 API 读写同一份结构化知识。决策、教训、规则、洞察——写一次，所有人都能用。
+
+```
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+│  Kiro    │   │  Codex   │   │  Cursor  │   │   你     │
+│  Agent   │   │  Agent   │   │  Agent   │   │  (CLI)   │
+└────┬─────┘   └────┬─────┘   └────┬─────┘   └────┬─────┘
+     │              │              │              │
+     └──────────────┴──────────────┴──────────────┘
+                         │
+              ┌──────────▼──────────┐
+              │    EchoMemory       │
+              │  共享知识库 (SQLite) │
+              └─────────────────────┘
+```
+
+---
+
+## 设计亮点
+
+### 零依赖部署
+
+不需要 Docker，不需要 PostgreSQL，不需要 Node.js。一行 `pip install` 搞定。SQLite 单文件存储，任何有 Python 的机器都能跑。
+
+### Agent 身份认证
+
+每个 Agent 有独立账号。PBKDF2-SHA256 密码哈希（100000 轮）+ HMAC-SHA256 JWT Token（72h 过期）+ Ed25519 密钥对。你能追踪每条知识是谁写的，能随时撤销任何 Agent 的访问权。
+
+### 七种知识类型 + rejected 字段
+
+不只是存"我们选了什么"，还存"什么被否决了以及为什么"。Agent 不会再建议已经被否决的方案。
+
+| 类型 | 用途 |
+|------|------|
+| `decision` | 技术选型、架构决策（必须包含 rejected） |
+| `lesson` | 踩坑经验、故障复盘 |
+| `process` | 操作流程、部署步骤 |
+| `insight` | 行业观察、趋势判断 |
+| `rule` | 团队规范、安全策略 |
+| `reference` | 有用的链接和资源 |
+| `contact` | 人脉和专家信息 |
+
+### 三种接入方式
+
+- **REST API** — 跨设备、跨网络访问，任何能发 HTTP 请求的工具都能用
+- **MCP Server** — Kiro / Claude Code / Cursor 原生集成，Agent 直接调用
+- **CLI** — 人工操作，快速查询和录入
+
+### 数据安全
+
+- 数据存在 `~/.echomemory/`（用户 home 目录），不在项目代码里
+- `.gitignore` 排除所有 `.db` 文件
+- 开源分享零泄露风险
+
+---
 
 ## 快速开始
-
-### 第一步：登录
-
-用你的账号密码换取 token（72小时有效）：
-
-```bash
-curl -s -X POST http://SERVER_ADDRESS/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"agent_id":"YOUR_AGENT_ID","secret":"YOUR_SECRET"}'
-```
-
-返回：
-```json
-{"token": "eyJ...", "agent_id": "agent_xxx", "expires_in": "72h"}
-```
-
-### 第二步：用 token 操作知识库
-
-所有后续请求都带上 token：
-```
-Authorization: Bearer <你的token>
-```
-
----
-
-## API 完整说明
-
-### 搜索知识（最常用）
-
-```bash
-curl -s -H "Authorization: Bearer TOKEN" \
-  "http://SERVER/api/search?q=搜索关键词&limit=10"
-```
-
-返回知识条目数组。每条包含 title、content、tags、rejected（被否决的方案）。
-
-### 获取上下文（开始新任务时调用）
-
-```bash
-curl -s -H "Authorization: Bearer TOKEN" \
-  "http://SERVER/api/context?q=任务主题"
-```
-
-返回格式化的上下文文本，可以直接作为你的背景知识。
-
-### 添加知识
-
-```bash
-curl -s -X POST -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  http://SERVER/api/knowledge \
-  -d '{
-    "type": "decision",
-    "title": "选择 X 而不是 Y",
-    "content": "详细原因和背景（150-300字）",
-    "rejected": [{"option":"Y","reason":"为什么不选Y"}],
-    "tags": ["标签1","标签2"]
-  }'
-```
-
-### 列出知识
-
-```bash
-# 全部
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/knowledge"
-
-# 按类型
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/knowledge?type=decision"
-
-# 按标签
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/knowledge?tag=安全"
-
-# 最近7天
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/knowledge?days=7"
-```
-
-### 查看统计
-
-```bash
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/stats"
-```
-
-### 查看所有标签
-
-```bash
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/tags"
-```
-
----
-
-## 知识类型（type 字段）
-
-| type | 什么时候用 | 必须包含 |
-|------|-----------|---------|
-| `decision` | 做了一个选择 | `rejected`（被否决的方案和原因） |
-| `lesson` | 踩了一个坑 | 具体的坑和解决方法 |
-| `process` | 确定了一个流程 | 步骤说明 |
-| `insight` | 发现了一个规律 | 观察和推断 |
-| `rule` | 定了一条规矩 | 规则内容和适用范围 |
-| `reference` | 记录一个有用的链接 | URL 和说明 |
-| `contact` | 记录一个人/资源 | 联系方式和专长 |
-
----
-
-## 你的行为规范
-
-### 开始任务前（必做）
-
-```bash
-# 搜索相关知识
-curl -s -H "Authorization: Bearer TOKEN" "http://SERVER/api/context?q=你即将做的事"
-```
-
-如果搜索结果中有相关的 decision 或 rule，你必须遵循，除非用户明确要求推翻。
-
-如果搜索结果中有 rejected 项，不要再建议那些被否决的方案，除非情况已经变化。
-
-### 做完决策后（必做）
-
-以下情况必须写入知识库：
-- 技术选型（选了什么框架/工具/方案）
-- 架构决策（怎么组织代码/服务/数据）
-- 踩坑经验（什么东西不能这么用）
-- 流程确定（部署步骤/操作规范）
-- 团队规则（编码规范/安全要求）
-
-写入示例：
-```bash
-curl -s -X POST -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  http://SERVER/api/knowledge \
-  -d '{
-    "type": "decision",
-    "title": "EchoMemory 使用 SQLite 而非 PostgreSQL",
-    "content": "选择 SQLite 作为存储引擎。原因：零依赖部署，单文件便于备份和迁移，FTS5 提供全文搜索能力，对于个人和小团队的知识量完全够用。",
-    "rejected": [
-      {"option": "PostgreSQL", "reason": "需要额外部署和运维，对小团队过重"},
-      {"option": "MongoDB", "reason": "文档模型对结构化知识没有优势，且依赖重"}
-    ],
-    "tags": ["架构", "存储", "EchoMemory"]
-  }'
-```
-
-### 不要写入的内容
-
-- 临时的调试信息
-- 一次性的操作记录
-- 用户的私人信息
-- 密码、token、密钥
-
----
-
-## 错误处理
-
-| HTTP 状态码 | 含义 | 你该怎么做 |
-|------------|------|-----------|
-| 200 | 成功 | 正常处理返回数据 |
-| 400 | 参数错误 | 检查请求体格式 |
-| 401 | 未认证 | 重新调用 /api/auth/login 获取新 token |
-| 403 | 权限不足 | 你没有执行该操作的权限 |
-| 404 | 未找到 | 检查 URL 路径 |
-
----
-
-## 部署信息（给管理员看的）
 
 ### 安装
 
 ```bash
-git clone <repo>
+git clone https://github.com/EastSword/EchoMemory.git
 cd EchoMemory
 pip install -e .
 ```
@@ -187,56 +80,177 @@ pip install -e .
 ### 启动服务
 
 ```bash
-# 首次启动会自动创建 admin 账号（控制台输出凭证）
 echomemory serve --port 9090
-
-# 或指定数据库路径
-ECHOMEMORY_DB=/path/to/memory.db echomemory serve --port 9090
 ```
+
+首次启动自动创建 admin 账号，控制台会打印凭证（只显示一次，请保存）。
 
 ### 创建 Agent 账号
 
-用 admin token 创建：
+用 admin 登录后创建：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer ADMIN_TOKEN" \
+# 先登录拿 token
+TOKEN=$(curl -s -X POST http://localhost:9090/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"admin的agent_id","secret":"admin的secret"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
+
+# 创建新 agent
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   http://localhost:9090/api/agents/create \
-  -d '{"name":"codex-macbook","role":"agent"}'
+  -d '{"name":"my-codex-agent","role":"agent"}'
 ```
 
-返回 agent_id 和 secret，把这两个值给对应的 Agent 使用。
+返回 agent_id 和 secret，交给对应的 Agent 使用。
 
-### 撤销 Agent
+### Agent 接入
 
-```bash
-curl -s -X POST -H "Authorization: Bearer ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  http://localhost:9090/api/agents/revoke \
-  -d '{"agent_id":"agent_xxx"}'
-```
+把 [Agent 使用指南](docs/AGENT_GUIDE.md) 和账号信息给你的 Agent。它需要做的事：
 
-### 安全机制
+1. 用 agent_id + secret 调用 `/api/auth/login` 获取 JWT token
+2. 开始任务前调用 `/api/search` 或 `/api/context` 查看相关知识
+3. 做完决策后调用 `POST /api/knowledge` 写入新知识
 
-- 密码存储：PBKDF2-SHA256（100000轮）
-- 认证令牌：HMAC-SHA256 JWT（72小时过期）
-- 每个 Agent 独立 Ed25519 密钥对
-- 可选请求签名验证（X-Signature + X-Timestamp）
-- 角色权限：admin 可管理 agent，普通 agent 只能读写知识
-
-### CLI 工具（管理员本地使用）
+### 人工使用（CLI）
 
 ```bash
-echomemory add --type decision --title "..." --content "..." --tags "a,b"
-echomemory search "关键词"
-echomemory list --type decision --days 7
+# 添加知识
+echomemory add --type decision \
+  --title "选择 FastAPI 做后端" \
+  --content "性能好，类型提示友好，生态成熟" \
+  --rejected "Flask:太简陋" "Django:太重" \
+  --tags "架构,后端"
+
+# 搜索
+echomemory search "后端框架"
+
+# 查看统计
 echomemory stats
-echomemory inject --query "主题" --copy
-echomemory export --format md
+
+# 导出为 Markdown
+echomemory export --format md --days 30
 ```
+
+---
+
+## 谁可以使用
+
+| 使用者 | 怎么接入 | 场景 |
+|--------|---------|------|
+| AI Agent（Kiro/Claude Code/Cursor） | MCP Server 或 REST API | 自动读写知识，跨会话记忆 |
+| AI Agent（Codex/其他） | REST API（curl） | 任务前查知识，任务后写知识 |
+| 开发者（你） | CLI 工具 | 手动录入决策、查询历史 |
+| 团队成员 | REST API 或 CLI | 共享团队规范和经验 |
+| CI/CD 流水线 | REST API | 自动记录部署决策和变更 |
+| 自动化脚本 | REST API | 定期同步外部知识源 |
+
+---
+
+## 和同类项目的对比
+
+| 维度 | EchoMemory | RoBrain | Mem0 | Zep |
+|------|-----------|---------|------|-----|
+| 部署复杂度 | pip install | Docker+Postgres+Node | pip install | Docker+Postgres |
+| 知识类型 | 7 种 | 仅 decision | 事实 | 对话+实体 |
+| rejected 字段 | ✅ 一等公民 | ✅ | ❌ | ❌ |
+| 身份认证 | ✅ PBKDF2+JWT+Ed25519 | ❌ | ❌ | ❌ |
+| 中文支持 | ✅ 原生 | ❌ | ❌ | ❌ |
+| 多设备共享 | ✅ REST API | 需要 Postgres | 云服务 | 需要 Postgres |
+| 开源协议 | MIT | Apache 2.0 | Apache 2.0 | Apache 2.0 |
+
+---
+
+## 架构
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    EchoMemory Server                      │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐  │
+│  │ REST API │  │ MCP API  │  │   Auth Engine        │  │
+│  │ (HTTP)   │  │ (stdio)  │  │                      │  │
+│  └────┬─────┘  └────┬─────┘  │  - PBKDF2 密码哈希  │  │
+│       │              │        │  - JWT Token 签发    │  │
+│       └──────┬───────┘        │  - Ed25519 签名验证  │  │
+│              │                └──────────┬───────────┘  │
+│              ▼                           │              │
+│  ┌───────────────────────────────────────┐              │
+│  │         SQLite + FTS5                 │              │
+│  │  knowledge 表 + relations 表          │              │
+│  │  全文搜索索引自动同步                  │              │
+│  └───────────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## API 概览
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/api/auth/login` | 登录获取 token | 公开 |
+| GET | `/api/health` | 健康检查 | 公开 |
+| GET | `/api/search?q=` | 全文搜索知识 | agent |
+| GET | `/api/context?q=` | 获取任务上下文 | agent |
+| GET | `/api/knowledge` | 列出知识（支持筛选） | agent |
+| POST | `/api/knowledge` | 添加知识 | agent |
+| PUT | `/api/knowledge/:id/status` | 更新状态 | agent |
+| GET | `/api/tags` | 所有标签 | agent |
+| GET | `/api/stats` | 统计信息 | agent |
+| POST | `/api/agents/create` | 创建 agent 账号 | admin |
+| POST | `/api/agents/revoke` | 撤销 agent | admin |
+| GET | `/api/agents` | 列出所有 agent | admin |
+
+完整 API 文档见 [Agent 使用指南](docs/AGENT_GUIDE.md)。
+
+---
+
+## 文档
+
+- [Agent 使用指南](docs/AGENT_GUIDE.md) — 给 AI Agent 看的接入文档（直接发给你的 Agent）
+- [架构设计](DESIGN.md) — 技术架构和设计决策
+- [Codex 接入示例](examples/codex-instructions.md) — Codex/Claude Code 接入配置
+- [客户端脚本](examples/echomem-client.sh) — Shell 快捷命令
+
+---
+
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `ECHOMEMORY_DB` | `~/.echomemory/memory.db` | 知识库路径 |
+| `ECHOMEMORY_PORT` | `9090` | 服务端口 |
+
+---
+
+## Roadmap
+
+- [x] 核心存储层（SQLite + FTS5）
+- [x] REST API Server
+- [x] MCP Server
+- [x] CLI 工具
+- [x] Agent 身份认证（PBKDF2 + JWT + Ed25519）
+- [ ] 语义向量搜索（embedding）
+- [ ] 自动知识提取（接 LLM）
+- [ ] 矛盾检测（知识冲突告警）
+- [ ] Web UI 看板
+- [ ] Kiro Hook 自动捕获
+- [ ] 知识过期和清理策略
+
+---
+
+## 贡献
+
+欢迎 PR。优先方向：
+- 新的 Agent 集成（Windsurf、Zed、VS Code）
+- 语义搜索后端
+- 多语言文档
+- 测试用例
 
 ---
 
 ## License
 
-MIT
+MIT — 随便用，不用问。
