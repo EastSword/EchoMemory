@@ -192,6 +192,7 @@ var token=localStorage.getItem('em_token');
 var agentId=localStorage.getItem('em_agent');
 if(!token)window.location='/login';
 document.getElementById('userInfo').textContent=agentId||'';
+console.log('EchoMemory: token loaded, length='+((token||'').length)+', agent='+agentId);
 
 function headers(){return{'Authorization':'Bearer '+token};}
 function postHeaders(){return{'Authorization':'Bearer '+token,'Content-Type':'application/json'};}
@@ -224,9 +225,12 @@ async function loadStats(){
 async function loadKnowledge(){
     var type=document.getElementById('typeFilter').value;
     var url='/api/knowledge?limit=50'+(type?'&type='+type:'');
+    console.log('EchoMemory: fetching', url);
     var res=await fetch(url,{headers:headers()});
-    if(res.status===401){logout();return;}
+    console.log('EchoMemory: response status', res.status);
+    if(res.status===401){console.log('EchoMemory: 401, logging out');logout();return;}
     var items=await res.json();
+    console.log('EchoMemory: got', Array.isArray(items)?items.length:'non-array', 'items');
     if(!Array.isArray(items)){items=[];}
     renderKnowledge(items);
 }

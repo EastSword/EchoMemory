@@ -13,6 +13,7 @@ DEFAULT_PORT = int(os.environ.get("ECHOMEMORY_PORT", "9090"))
 
 
 class EchoMemoryHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
     storage = None
     registry = None
 
@@ -49,17 +50,24 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         return verify_signature(message, signature, public_key)
 
     def _send_json(self, data, status=200):
+        body = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
+        self.wfile.write(body)
 
     def _send_html(self, html, status=200):
+        body = html.encode()
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.end_headers()
-        self.wfile.write(html.encode())
+        self.wfile.write(body)
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
