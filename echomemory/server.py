@@ -7,7 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from .storage import Storage
 from .models import KnowledgeItem, Relation
 from .auth import AgentRegistry, verify_signature, sign_message, derive_shared_key, encrypt_payload
-from .web_ui import get_login_page, get_admin_page
+from .web_ui import get_login_page, get_admin_page, get_credentials_page
 
 DEFAULT_PORT = int(os.environ.get("ECHOMEMORY_PORT", "9090"))
 
@@ -28,6 +28,16 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         token = auth[7:]
         payload = self.registry.verify_token(token)
         return payload
+
+    def _get_agent_from_cookie(self):
+        """Extract and verify JWT from cookie"""
+        cookies = self.headers.get("Cookie", "")
+        for part in cookies.split(";"):
+            part = part.strip()
+            if part.startswith("em_token="):
+                token = part[9:]
+                return self.registry.verify_token(token)
+        return None
 
     def _verify_request_signature(self, agent_id: str, body: str = ""):
         """Verify Ed25519 signature on request"""
@@ -75,6 +85,21 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
             return self.rfile.read(length).decode()
         return ""
 
+    def _parse_form(self, body):
+        from urllib.parse import unquote_plus
+        form = {}
+        for pair in body.split("&"):
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                form[unquote_plus(k)] = unquote_plus(v)
+        return form
+
+    def _redirect(self, url):
+        self.send_response(302)
+        self.send_header("Location", url)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -91,11 +116,29 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return self._send_json({"status": "ok", "service": "echomemory", "version": "0.1.0", "auth": "enabled"})
 
-        # Web UI pages (no API auth, uses localStorage token)
+        # Web UI pages (server-side rendered, cookie-based auth)
         if path in ["/", "/login"]:
             return self._send_html(get_login_page())
+        if path == "/logout":
+            self.send_response(302)
+            self.send_header("Location", "/login")
+            self.send_header("Set-Cookie", "em_token=; Max-Age=0; Path=/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if path == "/admin":
-            return self._send_html(get_admin_page())
+            agent = self._get_agent_from_cookie()
+            if not agent:
+                self.send_response(302)
+                self.send_header("Location", "/login")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            page = params.get("page", ["knowledge"])[0]
+            msg = params.get("msg", [""])[0]
+            from .web_ui import get_admin_page
+            html = get_admin_page(self.storage, self.registry, agent, page, msg)
+            return self._send_html(html)
 
         # Auth endpoint
         if path == "/api/auth/login":
@@ -167,7 +210,88 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         raw_body = self._read_body()
-        data = json.loads(raw_body) if raw_body else {}
+
+        # === Web form handlers (cookie-based) ===
+        if path == "/login":
+            # Parse form data
+            form = {}
+            for pair in raw_body.split("&"):
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    from urllib.parse import unquote_plus
+                    form[unquote_plus(k)] = unquote_plus(v)
+            agent_id = form.get("agent_id", "")
+            secret = form.get("secret", "")
+            token = self.registry.authenticate(agent_id, secret)
+            if not token:
+                from .web_ui import get_login_page
+                return self._send_html(get_login_page("认证失败：账号或密码错误"))
+            self.send_response(302)
+            self.send_header("Location", "/admin")
+            self.send_header("Set-Cookie", f"em_token={token}; Path=/; HttpOnly; Max-Age=259200")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        if path == "/admin/delete":
+            agent = self._get_agent_from_cookie()
+            if not agent:
+                return self._redirect("/login")
+            form = self._parse_form(raw_body)
+            item_id = form.get("id", "")
+            if item_id:
+                self.storage.delete(item_id)
+            return self._redirect("/admin?page=knowledge&msg=已删除")
+
+        if path == "/admin/add-knowledge":
+            agent = self._get_agent_from_cookie()
+            if not agent:
+                return self._redirect("/login")
+            form = self._parse_form(raw_body)
+            rejected = []
+            for line in form.get("rejected", "").split("\n"):
+                line = line.strip()
+                if ":" in line:
+                    parts = line.split(":", 1)
+                    rejected.append({"option": parts[0].strip(), "reason": parts[1].strip()})
+            tags = [t.strip() for t in form.get("tags", "").split(",") if t.strip()]
+            item = KnowledgeItem(
+                type=form.get("type", "insight"),
+                title=form.get("title", ""),
+                content=form.get("content", ""),
+                rejected=rejected,
+                tags=tags,
+                source={"agent": agent.get("sub", ""), "name": agent.get("name", "")},
+            )
+            if item.title:
+                self.storage.add(item)
+            return self._redirect("/admin?page=knowledge&msg=已添加")
+
+        if path == "/admin/create-agent":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=agents&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            name = form.get("name", "")
+            role = form.get("role", "agent")
+            if name:
+                creds = self.registry.create_agent(name, role)
+                from .web_ui import get_credentials_page
+                return self._send_html(get_credentials_page(creds))
+            return self._redirect("/admin?page=agents&msg=名称不能为空")
+
+        if path == "/admin/revoke":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=agents&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            target_id = form.get("agent_id", "")
+            if target_id:
+                self.registry.revoke_agent(target_id)
+            return self._redirect("/admin?page=agents&msg=已撤销")
+
+        # === API handlers (token-based) ===
+        data = json.loads(raw_body) if raw_body and raw_body.startswith("{") else {}
 
         # Auth login — no token required
         if path == "/api/auth/login":
