@@ -112,8 +112,8 @@ tr:last-child td{border-bottom:none}
 <header class="header">
 <div class="logo"><svg width="22" height="22" viewBox="0 0 100 100" style="vertical-align:middle;margin-right:6px"><defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient></defs><circle cx="50" cy="50" r="45" fill="#0f172a" stroke="url(#lg)" stroke-width="4"/><path d="M30 50 C30 35 40 25 50 25 C60 25 70 35 70 50 C70 65 60 75 50 75 C40 75 30 65 30 50 Z" fill="none" stroke="#f59e0b" stroke-width="3"/><circle cx="50" cy="42" r="6" fill="#f59e0b"/><path d="M38 58 Q50 68 62 58" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><circle cx="35" cy="50" r="3" fill="#22c55e" opacity="0.8"/><circle cx="65" cy="50" r="3" fill="#60a5fa" opacity="0.8"/><circle cx="50" cy="30" r="2.5" fill="#c084fc" opacity="0.8"/></svg>Echo<span>Memory</span></div>
 <nav class="nav">
-<button class="active" onclick="showPanel('knowledge')">知识库</button>
-<button onclick="showPanel('agents')">Agent 管理</button>
+<button class="active" data-panel="knowledge" onclick="showPanel('knowledge',this)">知识库</button>
+<button data-panel="agents" onclick="showPanel('agents',this)">Agent 管理</button>
 </nav>
 <span class="user-info" id="userInfo"></span>
 <span class="logout" onclick="logout()">退出</span>
@@ -193,13 +193,13 @@ var agentId=localStorage.getItem('em_agent');
 if(!token)window.location='/login';
 document.getElementById('userInfo').textContent=agentId||'';
 
-function headers(){return{'Authorization':'Bearer '+token,'Content-Type':'application/json'};}
-function showPanel(name){
+function headers(){return{'Authorization':'Bearer '+token};}
+function postHeaders(){return{'Authorization':'Bearer '+token,'Content-Type':'application/json'};}
+function showPanel(name,btn){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     document.getElementById('panel-'+name).classList.add('active');
-    document.querySelectorAll('.nav button').forEach(function(b){
-        b.classList.toggle('active', b.textContent.includes(name==='knowledge'?'知识':'Agent'));
-    });
+    document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+    if(btn)btn.classList.add('active');
     if(name==='agents')loadAgents();
     if(name==='knowledge')loadKnowledge();
 }
@@ -268,7 +268,7 @@ async function addKnowledge(){
         var parts=line.split(':');return{option:parts[0].trim(),reason:(parts[1]||'').trim()};
     });
     var tags=document.getElementById('addTags').value.split(',').map(function(t){return t.trim();}).filter(Boolean);
-    var res=await fetch('/api/knowledge',{method:'POST',headers:headers(),body:JSON.stringify({
+    var res=await fetch('/api/knowledge',{method:'POST',headers:postHeaders(),body:JSON.stringify({
         type:document.getElementById('addType').value,
         title:document.getElementById('addTitle').value,
         content:document.getElementById('addContent').value,
@@ -312,7 +312,7 @@ function openCreateAgentModal(){openModal('agentModal');}
 async function createAgent(){
     var name=document.getElementById('agentName').value.trim();
     if(!name){alert('请输入名称');return;}
-    var res=await fetch('/api/agents/create',{method:'POST',headers:headers(),body:JSON.stringify({
+    var res=await fetch('/api/agents/create',{method:'POST',headers:postHeaders(),body:JSON.stringify({
         name:name,role:document.getElementById('agentRole').value
     })});
     var data=await res.json();
@@ -329,7 +329,7 @@ async function createAgent(){
 
 async function revokeAgent(id){
     if(!confirm('确认撤销 '+id+' 的访问权限？'))return;
-    await fetch('/api/agents/revoke',{method:'POST',headers:headers(),body:JSON.stringify({agent_id:id})});
+    await fetch('/api/agents/revoke',{method:'POST',headers:postHeaders(),body:JSON.stringify({agent_id:id})});
     loadAgents();
 }
 
