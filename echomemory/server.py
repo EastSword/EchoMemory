@@ -2,7 +2,8 @@
 import json
 import os
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import traceback
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from .storage import Storage
 from .models import KnowledgeItem, Relation
@@ -80,8 +81,14 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_body(self):
-        length = int(self.headers.get("Content-Length", 0))
-        if length:
+        raw = self.headers.get("Content-Length")
+        if not raw:
+            return ""
+        try:
+            length = int(raw)
+        except (ValueError, TypeError):
+            return ""
+        if length > 0:
             return self.rfile.read(length).decode()
         return ""
 
@@ -95,6 +102,13 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         return form
 
     def _redirect(self, url):
+        from urllib.parse import quote, urlparse, urlencode, parse_qs, urlunparse
+        # Encode non-ASCII characters in query string for HTTP header compatibility
+        parts = urlparse(url)
+        if parts.query:
+            params = parse_qs(parts.query, keep_blank_values=True)
+            encoded_query = urlencode({k: v[0] for k, v in params.items()}, quote_via=quote)
+            url = urlunparse(parts._replace(query=encoded_query))
         self.send_response(302)
         self.send_header("Location", url)
         self.send_header("Content-Length", "0")
@@ -108,6 +122,13 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        try:
+            self._handle_get()
+        except Exception:
+            traceback.print_exc()
+            self._send_json({"error": "internal server error"}, 500)
+
+    def _handle_get(self):
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
@@ -203,10 +224,21 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "admin only"}, 403)
             self._send_json(self.registry.list_agents())
 
+        elif path == "/api/knowledge-types":
+            types = self.storage.get_knowledge_types()
+            self._send_json(types)
+
         else:
             self._send_json({"error": "not found"}, 404)
 
     def do_POST(self):
+        try:
+            self._handle_post()
+        except Exception:
+            traceback.print_exc()
+            self._send_json({"error": "internal server error"}, 500)
+
+    def _handle_post(self):
         parsed = urlparse(self.path)
         path = parsed.path
         raw_body = self._read_body()
@@ -290,6 +322,59 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
                 self.registry.revoke_agent(target_id)
             return self._redirect("/admin?page=agents&msg=已撤销")
 
+        if path == "/admin/add-type":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=types&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            name = form.get("name", "").strip().lower()
+            label = form.get("label", "").strip()
+            description = form.get("description", "").strip()
+            color = form.get("color", "#94a3b8").strip()
+            if name and label:
+                self.storage.add_knowledge_type(name, label, description, color)
+                return self._redirect("/admin?page=types&msg=类型已添加")
+            return self._redirect("/admin?page=types&msg=名称和显示名不能为空")
+
+        if path == "/admin/update-type":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=types&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            name = form.get("name", "").strip()
+            label = form.get("label", "").strip() or None
+            description = form.get("description", "").strip()
+            color = form.get("color", "").strip() or None
+            if name:
+                self.storage.update_knowledge_type(name, label, description, color)
+            return self._redirect("/admin?page=types&msg=类型已更新")
+
+        if path == "/admin/delete-type":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=types&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            name = form.get("name", "").strip()
+            if name:
+                success = self.storage.delete_knowledge_type(name)
+                if not success:
+                    return self._redirect("/admin?page=types&msg=无法删除：内置类型或仍有关联知识")
+            return self._redirect("/admin?page=types&msg=类型已删除")
+
+        if path == "/admin/create-agent-with-prompt":
+            agent = self._get_agent_from_cookie()
+            if not agent or agent.get("role") != "admin":
+                return self._redirect("/admin?page=integration&msg=需要admin权限")
+            form = self._parse_form(raw_body)
+            name = form.get("name", "")
+            role = form.get("role", "agent")
+            server_url = form.get("server_url", "http://localhost:9090")
+            if name:
+                creds = self.registry.create_agent(name, role)
+                from .web_ui import get_credentials_with_prompt_page
+                return self._send_html(get_credentials_with_prompt_page(creds, server_url))
+            return self._redirect("/admin?page=integration&msg=名称不能为空")
+
         # === API handlers (token-based) ===
         data = json.loads(raw_body) if raw_body and raw_body.startswith("{") else {}
 
@@ -365,6 +450,13 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "not found"}, 404)
 
     def do_PUT(self):
+        try:
+            self._handle_put()
+        except Exception:
+            traceback.print_exc()
+            self._send_json({"error": "internal server error"}, 500)
+
+    def _handle_put(self):
         agent = self._get_agent_from_token()
         if not agent:
             return self._send_json({"error": "unauthorized"}, 401)
@@ -386,6 +478,13 @@ class EchoMemoryHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "not found"}, 404)
 
     def do_DELETE(self):
+        try:
+            self._handle_delete()
+        except Exception:
+            traceback.print_exc()
+            self._send_json({"error": "internal server error"}, 500)
+
+    def _handle_delete(self):
         agent = self._get_agent_from_token()
         if not agent:
             return self._send_json({"error": "unauthorized"}, 401)
@@ -421,7 +520,7 @@ def run_server(port=DEFAULT_PORT, token=None, db_path=None):
         print(f"  Save these credentials — the secret won't be shown again.")
         print()
 
-    server = HTTPServer(("0.0.0.0", port), EchoMemoryHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", port), EchoMemoryHandler)
     print(f"EchoMemory Server v0.1.0")
     print(f"  Port: {port}")
     print(f"  Database: {storage.db_path}")
